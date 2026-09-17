@@ -106,16 +106,23 @@
     background: rgba(0,0,0,0.55); color: #fff; font-size: 10px; font-weight: 600;
     padding: 4px 6px 3px; border-radius: 6px; font-variant-numeric: tabular-nums;
     font-family: "Inter", "Noto Sans KR", sans-serif;
+    border: none; cursor: pointer; color-scheme: dark;
   }
-  .add-tile-photo {
-    border: none; border-radius: 0; background: none; flex: 0 0 40px;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--ink-soft); cursor: pointer; font-family: inherit;
+  .photo-time::-webkit-calendar-picker-indicator { filter: invert(1); opacity: .8; }
+  body.preview-mode .photo-time { pointer-events: none; }
+  body.preview-mode .photo-time::-webkit-calendar-picker-indicator { display: none; }
+  .add-tile-wrap {
+    flex: 0 0 40px; display: flex; flex-direction: column;
   }
-  .add-tile-photo .plus { font-size: 22px; line-height: 1; font-weight: 300; }
-  .add-tile-photo:hover { color: var(--moss); }
-  .add-tile-photo.is-solo { flex: 1 1 100%; min-height: 150px; }
-  .add-tile-photo.is-solo .plus { font-size: 26px; }
+  .add-tile-wrap.is-solo { flex: 1 1 100%; min-height: 150px; }
+  .add-photo-btn {
+    border: none; background: none; color: var(--ink-soft); cursor: pointer;
+    font-family: inherit; display: flex; align-items: center; justify-content: center;
+    flex: 1 1 auto; width: 100%;
+  }
+  .add-photo-btn:hover { color: var(--moss); }
+  .add-tile-wrap:not(.is-solo) .add-photo-btn .plus { font-size: 20px; line-height: 1; font-weight: 300; }
+  .add-tile-wrap.is-solo .add-photo-btn .plus { font-size: 28px; line-height: 1; font-weight: 300; }
 
   .quad-caption {
     border-top: 1px solid var(--line); padding: 9px 14px;
@@ -129,28 +136,22 @@
   .quad-lines { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
   .quad-line { display: flex; flex-direction: column; gap: 1px; line-height: 1.35; }
   .quad-line-top { display: flex; align-items: center; gap: 6px; }
-  .quad-line .q-time {
-    font-family: inherit; font-size: 11.5px; font-weight: 600; color: var(--ink-soft);
-    border: none; background: transparent; padding: 0; flex: 0 0 auto; max-width: 100px;
-    font-variant-numeric: tabular-nums;
-  }
   .quad-line .q-note {
     display: block; width: 100%; font-size: 12.5px; line-height: 1.35; color: var(--ink);
     word-break: break-word;
   }
   .quad-line .q-note:empty::before { content: "메모 없음"; color: var(--ink-soft); font-style: italic; }
+  .quad-line .q-note.quad-first-note:empty::before { content: attr(data-placeholder); }
   .quad-line .q-note[contenteditable="true"]:focus { outline: none; background: var(--paper); border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
   .quad-line .q-del {
     border: none; background: none; color: var(--ink-soft); cursor: pointer;
     font-size: 13px; line-height: 1; padding: 2px 4px; flex-shrink: 0; opacity: .55; margin-left: auto;
   }
   .quad-line .q-del:hover { opacity: 1; color: var(--clay); }
-  .quad-empty-line { font-size: 12.5px; color: var(--ink-soft); font-style: italic; }
 
-  body.preview-mode .add-tile-photo,
+  body.preview-mode .add-tile-wrap,
   body.preview-mode .q-del,
   body.preview-mode .date-input { display: none; }
-  body.preview-mode .quad-line-top { display: none; }
   body.preview-mode .q-note[contenteditable] { pointer-events: none; }
   body.preview-mode #dailyNote { pointer-events: none; }
 
@@ -176,11 +177,12 @@
   body.preview-mode .slot-chips { display: none; }
 
   .quad-remove {
-    border: none; background: none; color: var(--ink-soft); cursor: pointer;
-    font-size: 13px; line-height: 1; padding: 2px 4px; opacity: .5; margin-left: auto;
-    flex-shrink: 0; font-family: inherit;
+    border: none; background: var(--clay-soft, rgba(180,89,63,0.12)); color: var(--clay, #B4593F);
+    cursor: pointer; font-size: 11px; font-weight: 700; line-height: 1;
+    padding: 4px 8px; border-radius: 20px; opacity: .85; margin-left: auto;
+    flex-shrink: 0; font-family: "Inter", "Noto Sans KR", sans-serif;
   }
-  .quad-remove:hover { opacity: 1; color: var(--clay); }
+  .quad-remove:hover { opacity: 1; }
   body.preview-mode .quad-remove { display: none; }
 
   /* ---- photo source action sheet ---- */
@@ -524,26 +526,37 @@ function render(){
     const photos = document.createElement('div');
     photos.className = 'quad-photos';
 
-    list.forEach(entry => {
+    const photoEntries = list.filter(entry => entry.dataUrl);
+    photoEntries.forEach(entry => {
       const cell = document.createElement('div');
       cell.className = 'photo-cell';
       const img = document.createElement('img');
       img.src = entry.dataUrl;
       img.alt = badgeLabel + ' 사진';
       cell.appendChild(img);
-      const timeTag = document.createElement('span');
+      const timeTag = document.createElement('input');
+      timeTag.type = 'time';
       timeTag.className = 'photo-time';
-      timeTag.textContent = entry.time;
+      timeTag.value = entry.time;
+      timeTag.addEventListener('click', (ev) => ev.stopPropagation());
+      timeTag.addEventListener('change', (ev) => { updateTime(slot.id, entry.id, ev.target.value); render(); });
       cell.appendChild(timeTag);
       photos.appendChild(cell);
     });
 
-    const addTile = document.createElement('button');
-    addTile.type = 'button';
-    addTile.className = 'add-tile-photo' + (list.length === 0 ? ' is-solo' : '');
-    addTile.innerHTML = `<span class="plus">+</span>`;
-    addTile.addEventListener('click', () => openPhotoSheet(slot.id));
-    photos.appendChild(addTile);
+    const isSolo = photoEntries.length === 0;
+    const addWrap = document.createElement('div');
+    addWrap.className = 'add-tile-wrap' + (isSolo ? ' is-solo' : '');
+
+    const addPhotoBtn = document.createElement('button');
+    addPhotoBtn.type = 'button';
+    addPhotoBtn.className = 'add-photo-btn';
+    addPhotoBtn.title = '사진 추가';
+    addPhotoBtn.innerHTML = `<span class="plus">+</span>`;
+    addPhotoBtn.addEventListener('click', () => openPhotoSheet(slot.id));
+    addWrap.appendChild(addPhotoBtn);
+
+    photos.appendChild(addWrap);
 
     section.appendChild(photos);
 
@@ -560,23 +573,44 @@ function render(){
     lines.className = 'quad-lines';
 
     if(list.length === 0){
-      const emptyLine = document.createElement('div');
-      emptyLine.className = 'quad-empty-line';
-      emptyLine.textContent = '기록 없음';
-      lines.appendChild(emptyLine);
+      const line = document.createElement('div');
+      line.className = 'quad-line';
+      line.innerHTML = `<span class="q-note quad-first-note" contenteditable="true" data-placeholder="기록 없음"></span>`;
+      const noteEl = line.querySelector('.q-note');
+      let pendingId = null;
+      noteEl.addEventListener('input', (ev) => {
+        const text = ev.target.textContent;
+        if(pendingId === null){
+          const entry = { id: ++idCounter, dataUrl: null, time: nowTimeStr(), note: text };
+          entriesBySlot[slot.id].push(entry);
+          pendingId = entry.id;
+          saveCurrentDay();
+        } else {
+          updateNote(slot.id, pendingId, text);
+        }
+      });
+      noteEl.addEventListener('blur', () => {
+        if(pendingId !== null){
+          const e = entriesBySlot[slot.id].find(en => en.id === pendingId);
+          if(e && !e.note.trim() && !e.dataUrl){
+            entriesBySlot[slot.id] = entriesBySlot[slot.id].filter(en => en.id !== pendingId);
+            saveCurrentDay();
+          }
+        }
+        render();
+      });
+      lines.appendChild(line);
     } else {
       list.forEach(entry => {
         const line = document.createElement('div');
         line.className = 'quad-line';
+        line.dataset.entryId = entry.id;
         line.innerHTML = `
           <div class="quad-line-top">
-            <input type="time" class="q-time" value="${entry.time}">
-            <button class="q-del" title="삭제">✕</button>
+            <button class="q-del" title="메모 삭제">✕</button>
           </div>
           <span class="q-note" contenteditable="true" data-placeholder="메모 추가"></span>
         `;
-        const timeInput = line.querySelector('.q-time');
-        timeInput.addEventListener('change', (ev) => { updateTime(slot.id, entry.id, ev.target.value); render(); });
         line.querySelector('.q-del').addEventListener('click', () => removeEntry(slot.id, entry.id));
         const noteEl = line.querySelector('.q-note');
         noteEl.textContent = entry.note;
@@ -589,8 +623,8 @@ function render(){
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'quad-remove';
-    removeBtn.title = '슬롯 제거';
-    removeBtn.textContent = '✕';
+    removeBtn.title = '이 칸 전체 삭제';
+    removeBtn.textContent = '삭제';
     removeBtn.addEventListener('click', () => removeSlot(slot.id));
     caption.appendChild(removeBtn);
 
