@@ -795,6 +795,7 @@ function updateNote(slotId, id, val){
   const e = entriesBySlot[slotId].find(e => e.id === id);
   if(e) e.note = val;
   saveCurrentDay();
+  renderMergedView();
 }
 
 function rotateEntry(slotId, id){
@@ -804,57 +805,106 @@ function rotateEntry(slotId, id){
   saveCurrentDay();
 }
 
-let cropDrag = null;
+let gesture = null;
 
-function startCropDrag(ev, slotId, entryId, imgEl){
+function getEntry(slotId, entryId){
+  return (entriesBySlot[slotId] || []).find(e => e.id === entryId);
+}
+function applyImgTransform(imgEl, entry){
+  const scale = entry.scale || 1;
+  const panX = entry.panX || 0;
+  const panY = entry.panY || 0;
+  const rot = entry.rotation || 0;
+  // panX/panY는 %(이미지 자기 자신의 렌더링 크기 기준) 단위라, 칸 크기·비율이 달라져도 같은 비율로 반영됨
+  imgEl.style.transform = `translate(${panX}%, ${panY}%) scale(${scale}) rotate(${rot}deg)`;
+}
+function pointerDist(p1, p2){
+  return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+}
+
+function startGesture(ev, slotId, entryId, imgEl){
   if(document.body.classList.contains('preview-mode')) return;
   ev.preventDefault();
-  const entry = entriesBySlot[slotId].find(e => e.id === entryId);
+  const entry = getEntry(slotId, entryId);
   if(!entry) return;
-  const rect = imgEl.getBoundingClientRect();
-  cropDrag = {
-    slotId, entryId, imgEl,
-    startX: ev.clientX, startY: ev.clientY,
-    startCropX: entry.cropX ?? 50, startCropY: entry.cropY ?? 50,
-    rectW: rect.width || 1, rectH: rect.height || 1,
-    rotation: entry.rotation || 0,
-    curX: entry.cropX ?? 50, curY: entry.cropY ?? 50,
-    moved: false
-  };
-  window.addEventListener('pointermove', onCropDragMove);
-  window.addEventListener('pointerup', endCropDrag);
-  window.addEventListener('pointercancel', endCropDrag);
-}
-function onCropDragMove(ev){
-  if(!cropDrag) return;
-  cropDrag.moved = true;
-  let dx = ev.clientX - cropDrag.startX;
-  let dy = ev.clientY - cropDrag.startY;
-  // 회전된 이미지는 드래그 방향도 같이 보정
-  const rot = ((cropDrag.rotation % 360) + 360) % 360;
-  if(rot === 90){ const t = dx; dx = -dy; dy = t; }
-  else if(rot === 180){ dx = -dx; dy = -dy; }
-  else if(rot === 270){ const t = dx; dx = dy; dy = -t; }
-  let newX = cropDrag.startCropX - (dx / cropDrag.rectW) * 100;
-  let newY = cropDrag.startCropY - (dy / cropDrag.rectH) * 100;
-  newX = Math.max(0, Math.min(100, newX));
-  newY = Math.max(0, Math.min(100, newY));
-  cropDrag.imgEl.style.objectPosition = `${newX}% ${newY}%`;
-  cropDrag.curX = newX;
-  cropDrag.curY = newY;
-}
-function endCropDrag(ev){
-  if(!cropDrag) return;
-  const entry = entriesBySlot[cropDrag.slotId].find(e => e.id === cropDrag.entryId);
-  if(entry && cropDrag.moved){
-    entry.cropX = cropDrag.curX;
-    entry.cropY = cropDrag.curY;
-    saveCurrentDay();
+
+  if(!gesture || gesture.imgEl !== imgEl){
+    const rect = imgEl.getBoundingClientRect();
+    gesture = {
+      slotId, entryId, imgEl,
+      pointers: new Map(),
+      rectW: rect.width || 1,
+      rectH: rect.height || 1,
+      baseScale: entry.scale || 1,
+      basePanX: entry.panX || 0,
+      basePanY: entry.panY || 0,
+      panStart: null,
+      pinchStartDist: null,
+      moved: false
+    };
+    window.addEventListener('pointermove', onGestureMove);
+    window.addEventListener('pointerup', onGestureUp);
+    window.addEventListener('pointercancel', onGestureUp);
   }
-  window.removeEventListener('pointermove', onCropDragMove);
-  window.removeEventListener('pointerup', endCropDrag);
-  window.removeEventListener('pointercancel', endCropDrag);
-  cropDrag = null;
+
+  gesture.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+
+  if(gesture.pointers.size === 1){
+    const p = [...gesture.pointers.values()][0];
+    gesture.panStart = { x: p.x, y: p.y };
+    gesture.basePanX = entry.panX || 0;
+    gesture.basePanY = entry.panY || 0;
+  } else if(gesture.pointers.size === 2){
+    const [p1, p2] = [...gesture.pointers.values()];
+    gesture.pinchStartDist = pointerDist(p1, p2) || 1;
+    gesture.baseScale = entry.scale || 1;
+  }
+}
+
+function onGestureMove(ev){
+  if(!gesture || !gesture.pointers.has(ev.pointerId)) return;
+  gesture.moved = true;
+  gesture.pointers.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+  const entry = getEntry(gesture.slotId, gesture.entryId);
+  if(!entry) return;
+
+  if(gesture.pointers.size === 1 && gesture.panStart){
+    const p = [...gesture.pointers.values()][0];
+    const dxPct = ((p.x - gesture.panStart.x) / gesture.rectW) * 100;
+    const dyPct = ((p.y - gesture.panStart.y) / gesture.rectH) * 100;
+    entry.panX = gesture.basePanX + dxPct;
+    entry.panY = gesture.basePanY + dyPct;
+  } else if(gesture.pointers.size === 2 && gesture.pinchStartDist){
+    const [p1, p2] = [...gesture.pointers.values()];
+    const dist = pointerDist(p1, p2) || 1;
+    const scale = (gesture.baseScale * dist) / gesture.pinchStartDist;
+    entry.scale = Math.max(1, Math.min(4, scale));
+  }
+  applyImgTransform(gesture.imgEl, entry);
+}
+
+function onGestureUp(ev){
+  if(!gesture) return;
+  gesture.pointers.delete(ev.pointerId);
+
+  const entry = getEntry(gesture.slotId, gesture.entryId);
+
+  if(gesture.pointers.size === 1 && entry){
+    // 두 손가락 중 하나를 뗐을 때, 남은 손가락 기준으로 팬을 다시 기준잡기
+    const p = [...gesture.pointers.values()][0];
+    gesture.panStart = { x: p.x, y: p.y };
+    gesture.basePanX = entry.panX || 0;
+    gesture.basePanY = entry.panY || 0;
+    gesture.pinchStartDist = null;
+  }
+
+  if(gesture.pointers.size === 0){
+    if(entry && gesture.moved) saveCurrentDay();
+    window.removeEventListener('pointermove', onGestureMove);
+    window.removeEventListener('pointerup', onGestureUp);
+    window.removeEventListener('pointercancel', onGestureUp);
+    gesture = null;
+  }
 }
 
 let tileLayout = localStorage.getItem('zalmeogeoyo_layout_v1') || 'square';
@@ -952,9 +1002,8 @@ function render(){
         img.src = entry.dataUrl;
         img.alt = badgeLabel + ' 사진';
         img.draggable = false;
-        img.style.transform = `rotate(${entry.rotation || 0}deg)`;
-        img.style.objectPosition = `${entry.cropX ?? 50}% ${entry.cropY ?? 50}%`;
-        img.addEventListener('pointerdown', (ev) => startCropDrag(ev, slot.id, entry.id, img));
+        applyImgTransform(img, entry);
+        img.addEventListener('pointerdown', (ev) => startGesture(ev, slot.id, entry.id, img));
         cell.appendChild(img);
 
         const timeTag = document.createElement('button');
@@ -1106,8 +1155,7 @@ function renderMergedView(){
       const img = document.createElement('img');
       img.src = entry.dataUrl;
       img.alt = meal.label + ' 사진';
-      img.style.transform = `rotate(${entry.rotation || 0}deg)`;
-      img.style.objectPosition = `${entry.cropX ?? 50}% ${entry.cropY ?? 50}%`;
+      applyImgTransform(img, entry);
       photoBox.appendChild(img);
 
       const timeTag = document.createElement('span');
