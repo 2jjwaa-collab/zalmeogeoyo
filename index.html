@@ -177,8 +177,15 @@
     display: flex; align-items: center; justify-content: center;
     background: rgba(0,0,0,0.5); color: #fff; font-size: 11px; line-height: 1; padding: 0;
   }
+  .tile-zoom {
+    position: absolute; bottom: 4px; left: 4px; z-index: 1;
+    width: 20px; height: 20px; border-radius: 50%; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5); color: #fff; font-size: 10px; line-height: 1; padding: 0;
+  }
   body.preview-mode .tile-delete,
-  body.preview-mode .tile-rotate { display: none; }
+  body.preview-mode .tile-rotate,
+  body.preview-mode .tile-zoom { display: none; }
 
   .layout-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
   .layout-chip {
@@ -805,6 +812,20 @@ function rotateEntry(slotId, id){
   saveCurrentDay();
 }
 
+const ZOOM_STEPS = [1, 1.5, 2, 2.5];
+function zoomEntry(slotId, id){
+  const e = entriesBySlot[slotId].find(e => e.id === id);
+  if(!e) return;
+  const cur = e.scale || 1;
+  let idx = ZOOM_STEPS.findIndex(s => Math.abs(s - cur) < 0.01);
+  if(idx === -1) idx = 0;
+  idx = (idx + 1) % ZOOM_STEPS.length;
+  e.scale = ZOOM_STEPS[idx];
+  if(e.scale === 1){ e.panX = 0; e.panY = 0; }
+  render();
+  saveCurrentDay();
+}
+
 let gesture = null;
 
 function getEntry(slotId, entryId){
@@ -1024,6 +1045,14 @@ function render(){
         rotateBtn.addEventListener('click', (ev) => { ev.stopPropagation(); rotateEntry(slot.id, entry.id); });
         cell.appendChild(rotateBtn);
 
+        const zoomBtn = document.createElement('button');
+        zoomBtn.type = 'button';
+        zoomBtn.className = 'tile-zoom';
+        zoomBtn.title = '확대';
+        zoomBtn.textContent = '🔍';
+        zoomBtn.addEventListener('click', (ev) => { ev.stopPropagation(); zoomEntry(slot.id, entry.id); });
+        cell.appendChild(zoomBtn);
+
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
         delBtn.className = 'tile-delete';
@@ -1226,9 +1255,39 @@ function renderSlotChips(){
   }
 }
 
+function lockTileSizesForExport(){
+  const els = document.querySelectorAll(
+    '#mergedView .merged-item, #mergedView .merged-photo, ' +
+    '#mealSections .photo-cell, #mealSections .text-cell, #mealSections .add-tile-wrap'
+  );
+  const restore = [];
+  els.forEach(el => {
+    const rect = el.getBoundingClientRect();
+    restore.push({
+      el, width: el.style.width, height: el.style.height,
+      flex: el.style.flex, aspectRatio: el.style.aspectRatio
+    });
+    el.style.width = rect.width + 'px';
+    el.style.height = rect.height + 'px';
+    el.style.flex = 'none';
+    el.style.aspectRatio = 'auto';
+  });
+  return restore;
+}
+function unlockTileSizes(restore){
+  restore.forEach(({ el, width, height, flex, aspectRatio }) => {
+    el.style.width = width;
+    el.style.height = height;
+    el.style.flex = flex;
+    el.style.aspectRatio = aspectRatio;
+  });
+}
+
 async function exportImage(){
   const wasPreview = document.body.classList.contains('preview-mode');
   setMode('preview');
+  await new Promise(r => requestAnimationFrame(r));
+  const restore = lockTileSizesForExport();
   const btn = document.getElementById('saveBtn');
   const original = btn.textContent;
   btn.textContent = '저장 중...';
@@ -1248,6 +1307,7 @@ async function exportImage(){
   }catch(err){
     alert('이미지 저장에 실패했어요: ' + err.message);
   }finally{
+    unlockTileSizes(restore);
     btn.textContent = original;
     btn.disabled = false;
     if(!wasPreview) setMode('edit');
