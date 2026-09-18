@@ -98,13 +98,54 @@
     flex: 1; padding: 0; display: flex; flex-wrap: wrap; gap: 2px;
     min-height: 150px;
   }
-  .photo-cell, .text-cell { position: relative; overflow: hidden; background: var(--paper); flex: 1 1 45%; min-width: 70px; }
-  .photo-cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .photo-cell, .text-cell { position: relative; overflow: hidden; background: var(--paper); flex: 1 1 45%; min-width: 70px; aspect-ratio: 1 / 1; }
+  .photo-cell img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    touch-action: none; -webkit-user-drag: none; user-select: none;
+  }
+  body:not(.preview-mode) .photo-cell img { cursor: grab; }
+  body:not(.preview-mode) .photo-cell img:active { cursor: grabbing; }
+
+  body[data-layout="portrait"] .photo-cell, body[data-layout="portrait"] .text-cell { aspect-ratio: 3 / 4; }
+  body[data-layout="wide"] .photo-cell, body[data-layout="wide"] .text-cell { aspect-ratio: 9 / 16; }
+
+  #mergedView { display: none; }
+  body[data-layout="strip"].preview-mode #mealSections,
+  body[data-layout="fourcut"].preview-mode #mealSections { display: none; }
+  body[data-layout="strip"].preview-mode #mergedView {
+    display: flex; flex-direction: row; flex-wrap: nowrap; gap: 2px;
+  }
+  body[data-layout="fourcut"].preview-mode #mergedView {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .merged-item { display: flex; flex-direction: column; }
+  body[data-layout="strip"] .merged-item { flex: 1 1 0; min-width: 0; }
+  body[data-layout="fourcut"] .merged-item { width: 100%; }
+  .merged-photo { position: relative; overflow: hidden; background: var(--paper); }
+  body[data-layout="strip"] .merged-photo { aspect-ratio: 3 / 4; }
+  body[data-layout="fourcut"] .merged-photo { aspect-ratio: 4 / 3; }
+  .merged-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .merged-photo-text {
+    display: flex; align-items: center; justify-content: center; padding: 8px;
+    border: 1px solid var(--line);
+  }
+  .merged-photo-note { font-size: 12px; text-align: center; color: var(--ink); word-break: break-word; }
+  .merged-caption {
+    border-top: 1px solid var(--line); padding: 9px 14px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .merged-note { font-size: 11px; line-height: 1.35; color: var(--ink); word-break: break-word; }
+  .merged-empty {
+    width: 100%; background: var(--paper); color: var(--ink-soft); font-style: italic;
+    text-align: center; padding: 30px 10px;
+  }
+
   .photo-time {
+    appearance: none; -webkit-appearance: none; margin: 0; box-sizing: border-box;
     position: absolute; left: 50%; bottom: 5px; transform: translateX(-50%); z-index: 1;
     display: inline-flex; align-items: center; justify-content: center; line-height: 1;
     background: rgba(0,0,0,0.55); color: #fff; font-size: 10px; font-weight: 600;
-    padding: 4px 6px 3px; border-radius: 6px; font-variant-numeric: tabular-nums;
+    padding: 5px 7px; border-radius: 6px; font-variant-numeric: tabular-nums;
     font-family: "Inter", "Noto Sans KR", sans-serif;
     border: none; cursor: pointer;
   }
@@ -120,6 +161,7 @@
     word-break: break-word; outline: none;
   }
   .text-cell-note:empty::before { content: attr(data-placeholder); color: var(--ink-soft); font-style: italic; }
+  body.preview-mode .text-cell-note:empty::before { content: none; }
   .text-cell-note:focus { background: var(--card); border-radius: 6px; }
 
   .tile-delete {
@@ -129,7 +171,23 @@
     background: rgba(0,0,0,0.5); color: #fff; font-size: 11px; line-height: 1; padding: 0;
   }
   .tile-delete-text { background: var(--line); color: var(--ink-soft); }
-  body.preview-mode .tile-delete { display: none; }
+  .tile-rotate {
+    position: absolute; top: 4px; left: 4px; z-index: 1;
+    width: 20px; height: 20px; border-radius: 50%; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.5); color: #fff; font-size: 11px; line-height: 1; padding: 0;
+  }
+  body.preview-mode .tile-delete,
+  body.preview-mode .tile-rotate { display: none; }
+
+  .layout-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .layout-chip {
+    padding: 7px 13px; border-radius: 20px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink-soft); font-size: 12.5px; font-weight: 600;
+    cursor: pointer; font-family: inherit;
+  }
+  .layout-chip.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  body.preview-mode .layout-chips { display: none; }
 
   .add-tile-wrap {
     flex: 0 0 40px; display: flex; flex-direction: column;
@@ -159,6 +217,7 @@
     word-break: break-word; outline: none;
   }
   .quad-lines .q-note:empty::before { content: "메모 추가"; color: var(--ink-soft); font-style: italic; }
+  body.preview-mode .quad-lines .q-note:empty::before { content: none; }
   .quad-lines .q-note:focus { background: var(--paper); border-radius: 6px; padding: 2px 4px; margin: -2px -4px; }
 
   body.preview-mode .add-tile-wrap,
@@ -178,6 +237,36 @@
     font-family: "Inter", "Noto Sans KR", sans-serif; cursor: pointer; box-shadow: var(--shadow);
   }
   .btn-save:active { transform: scale(0.99); }
+
+  .water-section { position: relative; border-top: 1px solid var(--line); padding: 12px 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  .water-remove {
+    position: absolute; top: 8px; right: 8px; z-index: 1;
+    width: 18px; height: 18px; border-radius: 50%; border: none; cursor: pointer;
+    background: var(--line); color: var(--ink-soft); font-size: 10px; line-height: 1; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .water-remove:hover { background: var(--clay-soft, rgba(180,89,63,0.12)); color: var(--clay, #B4593F); }
+  body.preview-mode .water-remove { display: none; }
+  .water-label { display: flex; align-items: center; justify-content: flex-start; }
+  .water-stepper { display: flex; align-items: center; gap: 10px; }
+  .water-stepper button {
+    border: none; background: var(--paper); color: var(--ink); width: 22px; height: 22px;
+    border-radius: 50%; font-size: 12px; cursor: pointer; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; padding: 0;
+  }
+  .water-stepper button:hover { background: var(--line); }
+  .water-stepper .water-count {
+    font-family: "Inter", "Noto Sans KR", sans-serif; font-weight: 700; font-size: 13px;
+    color: var(--ink); min-width: 14px; text-align: center; font-variant-numeric: tabular-nums;
+  }
+  body.preview-mode .water-stepper button { display: none; }
+  body.preview-mode .water-stepper .water-count { display: none; }
+  .water-gauge { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 5px; }
+  .water-cup {
+    width: 14px; height: 17px; border: 1.5px solid var(--ink); border-radius: 0 0 4px 4px;
+    background: var(--paper);
+  }
+  .water-cup.filled { background: linear-gradient(to top, var(--ink) 80%, var(--paper) 80%); }
 
   .slot-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .slot-chip {
@@ -217,6 +306,10 @@
   }
   .photo-sheet-panel button:last-child { border-bottom: none; color: var(--ink-soft); font-weight: 500; }
   .photo-sheet-panel button:active { background: var(--paper); }
+  .confirm-text {
+    padding: 18px 18px 6px; font-family: "Inter", "Noto Sans KR", sans-serif;
+    font-size: 13.5px; line-height: 1.5; color: var(--ink); text-align: center;
+  }
 
   /* ---- custom date picker ---- */
   .date-popup {
@@ -304,6 +397,14 @@
     <button id="previewBtn" onclick="setMode('preview')">미리보기</button>
   </div>
 
+  <div class="layout-chips" id="layoutChips">
+    <button type="button" class="layout-chip" data-layout="square">1:1</button>
+    <button type="button" class="layout-chip" data-layout="portrait">3:4</button>
+    <button type="button" class="layout-chip" data-layout="wide">16:9</button>
+    <button type="button" class="layout-chip" data-layout="strip">strip</button>
+    <button type="button" class="layout-chip" data-layout="fourcut">4cut</button>
+  </div>
+
   <div id="report">
     <div class="report-head">
       <div>
@@ -323,6 +424,19 @@
       </div>
     </div>
     <div id="mealSections"></div>
+    <div id="mergedView"></div>
+
+    <div class="water-section" id="waterSection">
+      <button type="button" class="water-remove" onclick="setWaterEnabled(false)" title="물 표시 끄기">✕</button>
+      <div class="water-gauge" id="waterGauge"></div>
+      <div class="water-label">
+        <div class="water-stepper">
+          <button type="button" onclick="adjustWater(-1)">－</button>
+          <span class="water-count" id="waterCount">0</span>
+          <button type="button" onclick="adjustWater(1)">＋</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="slot-chips" id="slotChips"></div>
@@ -338,6 +452,15 @@
     <button type="button" onclick="chooseTextOnly()">식단 기록만</button>
     <button type="button" onclick="choosePhotoFlow()">사진과 함께</button>
     <button type="button" onclick="closeAddChoiceSheet()">취소</button>
+  </div>
+</div>
+
+<div class="photo-sheet" id="confirmSheet">
+  <div class="photo-sheet-backdrop" onclick="closeConfirmSheet()"></div>
+  <div class="photo-sheet-panel">
+    <div class="confirm-text">이 칸의 사진과 메모가 모두 삭제돼요. 계속할까요?</div>
+    <button type="button" onclick="confirmSlotRemove()">삭제</button>
+    <button type="button" onclick="closeConfirmSheet()">취소</button>
   </div>
 </div>
 
@@ -402,6 +525,39 @@ let slots = [];
 let entriesBySlot = {};
 let idCounter = 0;
 let slotIdCounter = 0;
+let waterCups = 0;
+const WATER_GOAL = 8;
+let waterEnabled = localStorage.getItem('zalmeogeoyo_water_enabled_v1') !== 'false';
+
+function setWaterEnabled(val){
+  waterEnabled = val;
+  localStorage.setItem('zalmeogeoyo_water_enabled_v1', val ? 'true' : 'false');
+  applyWaterVisibility();
+  renderSlotChips();
+}
+function applyWaterVisibility(){
+  const section = document.getElementById('waterSection');
+  if(section) section.style.display = waterEnabled ? '' : 'none';
+}
+
+function adjustWater(delta){
+  waterCups = Math.max(0, Math.min(20, waterCups + delta));
+  renderWaterGauge();
+  saveCurrentDay();
+}
+function renderWaterGauge(){
+  const countEl = document.getElementById('waterCount');
+  if(countEl) countEl.textContent = waterCups;
+  const gauge = document.getElementById('waterGauge');
+  if(!gauge) return;
+  gauge.innerHTML = '';
+  const total = Math.max(WATER_GOAL, waterCups);
+  for(let i = 0; i < total; i++){
+    const cup = document.createElement('span');
+    cup.className = 'water-cup' + (i < waterCups ? ' filled' : '');
+    gauge.appendChild(cup);
+  }
+}
 
 function newSlotId(key){ return key + '_' + (++slotIdCounter); }
 
@@ -415,7 +571,7 @@ function saveCurrentDay(){
   try{
     const note = document.getElementById('dailyNote').textContent;
     localStorage.setItem(storageKey(currentDateStr), JSON.stringify({
-      slots, entriesBySlot, dailyNote: note
+      slots, entriesBySlot, dailyNote: note, waterCups
     }));
   }catch(e){
     alert('저장 공간이 가득 찼어요. 오래된 날짜의 사진을 좀 지워주세요.');
@@ -463,6 +619,8 @@ function loadDay(dateStr){
   });
 
   document.getElementById('dailyNote').textContent = (data && data.dailyNote) ? data.dailyNote : '';
+  waterCups = (data && typeof data.waterCups === 'number') ? data.waterCups : 0;
+  renderWaterGauge();
 }
 
 function pad(n){ return String(n).padStart(2,'0'); }
@@ -639,6 +797,81 @@ function updateNote(slotId, id, val){
   saveCurrentDay();
 }
 
+function rotateEntry(slotId, id){
+  const e = entriesBySlot[slotId].find(e => e.id === id);
+  if(e) e.rotation = ((e.rotation || 0) + 90) % 360;
+  render();
+  saveCurrentDay();
+}
+
+let cropDrag = null;
+
+function startCropDrag(ev, slotId, entryId, imgEl){
+  if(document.body.classList.contains('preview-mode')) return;
+  ev.preventDefault();
+  const entry = entriesBySlot[slotId].find(e => e.id === entryId);
+  if(!entry) return;
+  const rect = imgEl.getBoundingClientRect();
+  cropDrag = {
+    slotId, entryId, imgEl,
+    startX: ev.clientX, startY: ev.clientY,
+    startCropX: entry.cropX ?? 50, startCropY: entry.cropY ?? 50,
+    rectW: rect.width || 1, rectH: rect.height || 1,
+    rotation: entry.rotation || 0,
+    curX: entry.cropX ?? 50, curY: entry.cropY ?? 50,
+    moved: false
+  };
+  window.addEventListener('pointermove', onCropDragMove);
+  window.addEventListener('pointerup', endCropDrag);
+  window.addEventListener('pointercancel', endCropDrag);
+}
+function onCropDragMove(ev){
+  if(!cropDrag) return;
+  cropDrag.moved = true;
+  let dx = ev.clientX - cropDrag.startX;
+  let dy = ev.clientY - cropDrag.startY;
+  // 회전된 이미지는 드래그 방향도 같이 보정
+  const rot = ((cropDrag.rotation % 360) + 360) % 360;
+  if(rot === 90){ const t = dx; dx = -dy; dy = t; }
+  else if(rot === 180){ dx = -dx; dy = -dy; }
+  else if(rot === 270){ const t = dx; dx = dy; dy = -t; }
+  let newX = cropDrag.startCropX - (dx / cropDrag.rectW) * 100;
+  let newY = cropDrag.startCropY - (dy / cropDrag.rectH) * 100;
+  newX = Math.max(0, Math.min(100, newX));
+  newY = Math.max(0, Math.min(100, newY));
+  cropDrag.imgEl.style.objectPosition = `${newX}% ${newY}%`;
+  cropDrag.curX = newX;
+  cropDrag.curY = newY;
+}
+function endCropDrag(ev){
+  if(!cropDrag) return;
+  const entry = entriesBySlot[cropDrag.slotId].find(e => e.id === cropDrag.entryId);
+  if(entry && cropDrag.moved){
+    entry.cropX = cropDrag.curX;
+    entry.cropY = cropDrag.curY;
+    saveCurrentDay();
+  }
+  window.removeEventListener('pointermove', onCropDragMove);
+  window.removeEventListener('pointerup', endCropDrag);
+  window.removeEventListener('pointercancel', endCropDrag);
+  cropDrag = null;
+}
+
+let tileLayout = localStorage.getItem('zalmeogeoyo_layout_v1') || 'square';
+if(tileLayout === 'stack') tileLayout = 'fourcut';
+
+function setLayout(layout){
+  tileLayout = layout;
+  localStorage.setItem('zalmeogeoyo_layout_v1', layout);
+  document.body.dataset.layout = layout;
+  updateLayoutChipsUI();
+}
+function updateLayoutChipsUI(){
+  document.querySelectorAll('.layout-chip').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.layout === tileLayout);
+  });
+}
+
 function addSlot(key){
   const meal = mealDef(key);
   if(!meal.repeatable && slots.some(s => s.key === key)) return;
@@ -649,9 +882,27 @@ function addSlot(key){
   saveCurrentDay();
 }
 
+let pendingRemoveSlotId = null;
+
 function removeSlot(slotId){
   const hasPhotos = (entriesBySlot[slotId] || []).length > 0;
-  if(hasPhotos && !confirm('이 칸의 사진과 메모가 모두 삭제돼요. 계속할까요?')) return;
+  if(hasPhotos){
+    pendingRemoveSlotId = slotId;
+    document.getElementById('confirmSheet').style.display = 'flex';
+    return;
+  }
+  doRemoveSlot(slotId);
+}
+function closeConfirmSheet(){
+  document.getElementById('confirmSheet').style.display = 'none';
+  pendingRemoveSlotId = null;
+}
+function confirmSlotRemove(){
+  const id = pendingRemoveSlotId;
+  closeConfirmSheet();
+  if(id) doRemoveSlot(id);
+}
+function doRemoveSlot(slotId){
   slots = slots.filter(s => s.id !== slotId);
   delete entriesBySlot[slotId];
   render();
@@ -700,6 +951,10 @@ function render(){
         const img = document.createElement('img');
         img.src = entry.dataUrl;
         img.alt = badgeLabel + ' 사진';
+        img.draggable = false;
+        img.style.transform = `rotate(${entry.rotation || 0}deg)`;
+        img.style.objectPosition = `${entry.cropX ?? 50}% ${entry.cropY ?? 50}%`;
+        img.addEventListener('pointerdown', (ev) => startCropDrag(ev, slot.id, entry.id, img));
         cell.appendChild(img);
 
         const timeTag = document.createElement('button');
@@ -711,6 +966,14 @@ function render(){
           openTimePicker(slot.id, entry.id, entry.time);
         });
         cell.appendChild(timeTag);
+
+        const rotateBtn = document.createElement('button');
+        rotateBtn.type = 'button';
+        rotateBtn.className = 'tile-rotate';
+        rotateBtn.title = '회전';
+        rotateBtn.textContent = '⟳';
+        rotateBtn.addEventListener('click', (ev) => { ev.stopPropagation(); rotateEntry(slot.id, entry.id); });
+        cell.appendChild(rotateBtn);
 
         const delBtn = document.createElement('button');
         delBtn.type = 'button';
@@ -808,6 +1071,74 @@ function render(){
   document.getElementById('totalCount').textContent = total;
   renderSlotChips();
   equalizeCaptionHeights(totalRows);
+  renderMergedView();
+}
+
+function renderMergedView(){
+  const view = document.getElementById('mergedView');
+  view.innerHTML = '';
+
+  const allEntries = [];
+  slots.forEach(slot => {
+    const meal = mealDef(slot.key);
+    (entriesBySlot[slot.id] || []).forEach(entry => {
+      allEntries.push({ entry, meal });
+    });
+  });
+  allEntries.sort((a, b) => a.entry.time.localeCompare(b.entry.time));
+
+  if(allEntries.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'merged-empty';
+    empty.textContent = '기록 없음';
+    view.appendChild(empty);
+    return;
+  }
+
+  allEntries.forEach(({ entry, meal }) => {
+    const item = document.createElement('div');
+    item.className = 'merged-item';
+
+    const photoBox = document.createElement('div');
+    photoBox.className = 'merged-photo';
+
+    if(entry.dataUrl){
+      const img = document.createElement('img');
+      img.src = entry.dataUrl;
+      img.alt = meal.label + ' 사진';
+      img.style.transform = `rotate(${entry.rotation || 0}deg)`;
+      img.style.objectPosition = `${entry.cropX ?? 50}% ${entry.cropY ?? 50}%`;
+      photoBox.appendChild(img);
+
+      const timeTag = document.createElement('span');
+      timeTag.className = 'photo-time';
+      timeTag.textContent = entry.time;
+      photoBox.appendChild(timeTag);
+    } else {
+      photoBox.classList.add('merged-photo-text');
+      const txt = document.createElement('span');
+      txt.className = 'merged-photo-note';
+      txt.textContent = entry.note || '';
+      photoBox.appendChild(txt);
+    }
+    item.appendChild(photoBox);
+
+    const caption = document.createElement('div');
+    caption.className = 'merged-caption';
+    const badge = document.createElement('span');
+    badge.className = 'quad-badge';
+    badge.textContent = meal.label;
+    caption.appendChild(badge);
+    if(entry.dataUrl && entry.note){
+      const noteEl = document.createElement('span');
+      noteEl.className = 'merged-note';
+      noteEl.textContent = entry.note;
+      caption.appendChild(noteEl);
+    }
+    item.appendChild(caption);
+
+    view.appendChild(item);
+  });
 }
 
 function equalizeCaptionHeights(totalRows){
@@ -833,10 +1164,18 @@ function renderSlotChips(){
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'slot-chip';
-    chip.textContent = exists ? `+ ${meal.name} 추가` : `+ ${meal.name}`;
+    chip.textContent = `+ ${meal.name}`;
     chip.addEventListener('click', () => addSlot(meal.key));
     chipRow.appendChild(chip);
   });
+  if(!waterEnabled){
+    const waterChip = document.createElement('button');
+    waterChip.type = 'button';
+    waterChip.className = 'slot-chip';
+    waterChip.textContent = '+ 물';
+    waterChip.addEventListener('click', () => setWaterEnabled(true));
+    chipRow.appendChild(waterChip);
+  }
 }
 
 async function exportImage(){
@@ -950,6 +1289,13 @@ document.getElementById('galleryInput').addEventListener('change', (ev) => {
 initDate();
 render();
 document.getElementById('dailyNote').addEventListener('input', saveCurrentDay);
+
+document.body.dataset.layout = tileLayout;
+document.querySelectorAll('.layout-chip').forEach(btn => {
+  btn.addEventListener('click', () => setLayout(btn.dataset.layout));
+});
+updateLayoutChipsUI();
+applyWaterVisibility();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
